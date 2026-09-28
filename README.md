@@ -8,6 +8,15 @@ Python / FastAPI / SQLAlchemy / MySQL / HTML + CSS + JavaScript。
 
 默认应用 0.5 核 / 384MiB、临时区 128MiB。临时区使用内存，并不是 MySQL 磁盘缩容；已有交易环境与数据卷保留。高并发可观测真实用量与延迟，达到持续阈值才触发告警。
 
+容器名称通过 Compose 的 `container_name` 固定；后续启动继续使用以下名称：
+
+| 环境 | 应用 | MySQL | Prometheus |
+| --- | --- | --- | --- |
+| 主平台 | xiaotao-app | xiaotao-mysql | xiaotao-prometheus（可选） |
+| 资源演练 | xiaotao-lab-app | xiaotao-lab-mysql | xiaotao-lab-prometheus |
+
+Compose 项目分组和现有数据卷保留原来的 `chengming-*` 标识，继续使用原数据。服务之间仍通过 `app`、`mysql`、`prometheus` 服务名连接。当前为单副本实验，固定容器名不用于多副本扩容。
+
 这是可本地运行的模拟实验平台。首期包括账户、充值、提现、转账、支付、部分退款、双边账务、对账、结构化日志、限时故障演练、证据诊断和运维知识问答。GTP 已按要求取消。
 
 ## 在新机器运行

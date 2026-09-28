@@ -1,6 +1,7 @@
 name: chengming-resources
 services:
   mysql:
+    container_name: xiaotao-lab-mysql
     image: mysql:8.0
     cpus: ${LAB_DB_CPUS:-0.5}
     mem_limit: ${LAB_DB_MEMORY_MB:-512}m
@@ -24,6 +25,7 @@ services:
       options: {max-size: "5m", max-file: "2"}
     restart: unless-stopped
   app:
+    container_name: xiaotao-lab-app
     image: finops-lab:resources
     build: .
     cpus: ${LAB_APP_CPUS:-0.5}
@@ -55,6 +57,7 @@ services:
     logging: *logging
     restart: unless-stopped
   prometheus:
+    container_name: xiaotao-lab-prometheus
     image: prom/prometheus:v3.5.0
     cpus: 0.25
     mem_limit: 192m

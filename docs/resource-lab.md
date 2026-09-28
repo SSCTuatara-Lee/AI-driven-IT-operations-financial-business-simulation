@@ -24,7 +24,7 @@ LAB_PROMETHEUS_PORT=9091
 
 CPU 上限限制可用处理时间，并非绑定物理核。内存和 swap 上限设置为相同值，实验容器不能依靠额外 swap 掩盖内存不足。超出上限可能被 OOM 杀死，HTTP 客户端超时不代表交易没有记账。
 
-项目名固定为 `chengming-resources`，与已有 `chengming-finops` 的容器、网络和数据卷分离。品牌名称为 XIAOTAO；保留已有技术标识，避免误创建或丢失旧数据卷。默认模型配置为空，实验不会调用收费模型接口。
+容器名称固定为 `xiaotao-lab-app`、`xiaotao-lab-mysql`、`xiaotao-lab-prometheus`。底层 Compose 项目名仍为 `chengming-resources`，与主平台 `chengming-finops` 的网络和数据卷分离；原有数据卷继续复用。Docker Desktop 的项目分组因此仍可能显示旧标识。默认模型配置为空，实验不会调用收费模型接口。
 
 - 实验平台：http://127.0.0.1:8002/#resources
 - 独立告警页：http://127.0.0.1:9091/alerts
