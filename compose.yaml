@@ -1,0 +1,59 @@
+name: chengming-finops
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: finops
+      MYSQL_USER: finops
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/init_config.py first}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run scripts/init_config.py first}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -u finops -D finops -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+  app:
+    image: finops-lab:0.1.0
+    build: .
+    environment:
+      DATABASE_URL: mysql+pymysql://finops:${MYSQL_PASSWORD}@mysql:3306/finops?charset=utf8mb4
+      DATA_DIR: /app/data
+      APP_TOKEN: ${APP_TOKEN:-}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+    ports:
+      - "127.0.0.1:${APP_PORT:-8001}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - app-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  mysql-data:
+  app-data:
+  prometheus-data:

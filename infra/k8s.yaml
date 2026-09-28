@@ -1,0 +1,90 @@
+# Migration template: validate storage class, registry and TDSQL version before use.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finops-lab
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: finops-data
+  namespace: finops-lab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finops
+  namespace: finops-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: finops
+  template:
+    metadata:
+      labels:
+        app: finops
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: app
+          image: finops-lab:0.1.0
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: finops-secrets
+          env:
+            - name: DATA_DIR
+              value: /app/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: '1'
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: finops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finops
+  namespace: finops-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: finops
+  ports:
+    - port: 8000
+      targetPort: 8000
