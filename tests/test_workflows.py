@@ -127,7 +127,7 @@ def test_chat_fallback_citations_and_history(client):
 def test_live_ready_metrics_and_static(client):
     assert client.get("/health/ready").status_code==200
     assert "finops_http_requests_total" in client.get("/metrics").text
-    assert "澄明" in client.get("/").text
+    assert "XIAOTAO" in client.get("/").text
 
 def test_token_auth(client,monkeypatch):
     from app import main

@@ -1,4 +1,6 @@
 import hmac
+import asyncio
+import contextlib
 import json
 import os
 import re
@@ -12,7 +14,7 @@ from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
-from . import faults, knowledge, loadtesting
+from . import faults, knowledge, loadtesting, resources
 from .db import Account, Base, ChatTurn, Chunk, Document, Entry, Fault, Log, Session, Trade, engine
 from .diagnostics import diagnose
 from .domain import BusinessError, execute_trade, initialize, public_trade, reconcile, write_lock
@@ -26,12 +28,20 @@ async def lifespan(app):
     initialize()
     knowledge.seed_documents()
     loadtesting.recover_runs()
+    if resources.DRILLS_ENABLED:
+        resources.clear_capacity()
+    monitor = asyncio.create_task(resources.watch_alerts())
     try:
         yield
     finally:
         loadtesting.shutdown_runs()
+        monitor.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await monitor
+        if resources.DRILLS_ENABLED:
+            resources.clear_capacity()
 
-app = FastAPI(title="澄明 · 金融模拟与 AI 运维", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="XIAOTAO · 金融模拟与 AI 运维", version="0.1.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def context(request: Request, call_next):
@@ -278,5 +288,27 @@ def loadtest_report(run_id:str):
 @app.post("/api/loadtests/{run_id}/stop")
 def loadtest_stop(run_id:str, request:Request):
     return loadtesting.stop_run(run_id, request.state.trace_id)
+
+@app.get("/api/resources")
+def resource_status():
+    return resources.snapshot()
+
+class CapacityInput(BaseModel):
+    percent: int = Field(default=85, ge=1, le=95, strict=True)
+    duration_seconds: int = Field(default=60, ge=15, le=180, strict=True)
+
+@app.post("/api/resources/capacity")
+def capacity_start(body: CapacityInput, request: Request):
+    result = resources.fill_capacity(body.percent, body.duration_seconds)
+    emit(request.state.trace_id, "AUDIT_CAPACITY_START", "专用 tmpfs 容量区填充至 "+str(body.percent)+"%", service="audit")
+    return result
+
+@app.delete("/api/resources/capacity")
+def capacity_clear(request: Request):
+    if not resources.DRILLS_ENABLED:
+        raise BusinessError("RESOURCE_DRILL_DISABLED", "当前环境未启用容量演练", 409)
+    resources.clear_capacity()
+    emit(request.state.trace_id, "AUDIT_CAPACITY_STOP", "清理专用 tmpfs 容量演练文件", service="audit")
+    return {"cleared": True}
 
 app.mount("/",StaticFiles(directory="web",html=True),name="web")

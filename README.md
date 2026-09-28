@@ -1,6 +1,12 @@
-# 澄明 · 金融交易模拟与 AI 运维实验平台
+# XIAOTAO · 金融交易模拟与 AI 运维实验平台
 
 Python / FastAPI / SQLAlchemy / MySQL / HTML + CSS + JavaScript。
+
+## 独立资源演练与告警
+
+平台名称现为 **XIAOTAO**。双击 `start-resource-lab.cmd` 启动独立 MySQL 演练环境，访问 http://127.0.0.1:8002/#resources；Prometheus 告警页为 http://127.0.0.1:9091/alerts。CPU、内存和专用临时容量区可通过忽略上传的 `.env.resources` 调整。详见 [资源实验说明](docs/resource-lab.md)。
+
+默认应用 0.5 核 / 384MiB、临时区 128MiB。临时区使用内存，并不是 MySQL 磁盘缩容；已有交易环境与数据卷保留。高并发可观测真实用量与延迟，达到持续阈值才触发告警。
 
 这是可本地运行的模拟实验平台。首期包括账户、充值、提现、转账、支付、部分退款、双边账务、对账、结构化日志、限时故障演练、证据诊断和运维知识问答。GTP 已按要求取消。
 
@@ -24,7 +30,7 @@ Python、项目依赖和 Docker Desktop 4.92.0 已安装。按用户选择，保
 
 活动容器数据磁盘已放到 D:/lxt/.tools/docker-data/hyper-v/DockerDesktop.vhdx；已验证磁盘迁移、引擎重启后交易数据和压测报告保留。Windows Update 设置保持原状，无需为当前 Hyper-V 配置继续执行 wsl --update。WSL 本身仍受旧 Windows 补丁版本限制，诊断记录见 docs/docker-troubleshooting.md。
 
-32 项自动化测试已通过；真实本地 API 与并发压测已验证，浏览器视觉检查因访问许可被拒绝而未完成。
+38 项自动化测试已通过；真实本地 API 与并发压测已验证，浏览器视觉检查因访问许可被拒绝而未完成。
 
 ## 在当前机器启动
 

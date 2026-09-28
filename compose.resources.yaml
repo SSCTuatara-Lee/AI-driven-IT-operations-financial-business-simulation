@@ -1,0 +1,76 @@
+name: chengming-resources
+services:
+  mysql:
+    image: mysql:8.0
+    cpus: ${LAB_DB_CPUS:-0.5}
+    mem_limit: ${LAB_DB_MEMORY_MB:-512}m
+    memswap_limit: ${LAB_DB_MEMORY_MB:-512}m
+    environment:
+      MYSQL_DATABASE: finops
+      MYSQL_USER: finops
+      MYSQL_PASSWORD: ${LAB_MYSQL_PASSWORD:?Use scripts/resource_lab.py up}
+      MYSQL_ROOT_PASSWORD: ${LAB_MYSQL_ROOT_PASSWORD:?Use scripts/resource_lab.py up}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--innodb-buffer-pool-size=64M", "--max-connections=40", "--performance-schema=OFF"]
+    volumes:
+      - lab-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -u finops -D finops -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+    logging: &logging
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+    restart: unless-stopped
+  app:
+    image: finops-lab:resources
+    build: .
+    cpus: ${LAB_APP_CPUS:-0.5}
+    mem_limit: ${LAB_APP_MEMORY_MB:-384}m
+    memswap_limit: ${LAB_APP_MEMORY_MB:-384}m
+    environment:
+      DATABASE_URL: mysql+pymysql://finops:${LAB_MYSQL_PASSWORD}@mysql:3306/finops?charset=utf8mb4
+      DATA_DIR: /app/data
+      PROMETHEUS_URL: http://prometheus:9090
+      RESOURCE_DRILLS_ENABLED: 'true'
+      # Resource experiments do not call external model providers.
+      MODEL_BASE_URL: ''
+      MODEL_API_KEY: ''
+      CHAT_MODEL: ''
+      EMBEDDING_MODEL: ''
+    ports:
+      - "127.0.0.1:${LAB_APP_PORT:-8002}:8000"
+    volumes:
+      - lab-app:/app/data
+    tmpfs:
+      - /capacity-test:size=${LAB_CAPACITY_MB:-128}m,mode=1770,uid=10001,gid=10001
+    depends_on:
+      mysql: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    cpus: 0.25
+    mem_limit: 192m
+    memswap_limit: 192m
+    environment:
+      GOMEMLIMIT: 128MiB
+    ports:
+      - "127.0.0.1:${LAB_PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./infra/resource-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/resource-alerts.yml:/etc/prometheus/resource-alerts.yml:ro
+      - lab-prometheus:/prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=2d", "--storage.tsdb.retention.size=256MB"]
+    logging: *logging
+    restart: unless-stopped
+volumes:
+  lab-app:
+  lab-mysql:
+  lab-prometheus:

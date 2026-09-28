@@ -1,0 +1,59 @@
+groups:
+  - name: finops-resource-lab
+    interval: 5s
+    rules:
+      - alert: FinopsCpuHigh
+        expr: rate(finops_container_cpu_seconds_total[30s]) / finops_container_cpu_limit_cores > 0.80
+        for: 20s
+        labels:
+          severity: warning
+        annotations:
+          summary: 应用容器 CPU 超过配额的 80%，持续 20 秒
+      - alert: FinopsMemoryHigh
+        expr: finops_container_memory_bytes / finops_container_memory_limit_bytes > 0.85
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: 应用容器内存超过上限的 85%，持续 15 秒（含缓存和 tmpfs）
+      - alert: FinopsCapacityHigh
+        expr: finops_filesystem_used_bytes{area="capacity"} / finops_filesystem_total_bytes{area="capacity"} > 0.80
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: 专用临时容量区使用率超过 80%，持续 10 秒
+      - alert: FinopsDataFilesystemHigh
+        expr: finops_filesystem_used_bytes{area="data"} / finops_filesystem_total_bytes{area="data"} > 0.90
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: 数据所在共享文件系统使用率超过 90%，持续 30 秒
+      - alert: FinopsTradeLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le, job, instance) (rate(finops_http_duration_seconds_bucket{route="/api/trades"}[1m]))) > 1 and on(job, instance) sum by(job, instance) (rate(finops_http_duration_seconds_count{route="/api/trades"}[1m])) > 0.2
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: 交易请求 P95 超过 1 秒，持续 15 秒
+      - alert: FinopsTradeErrorsHigh
+        expr: sum by(job, instance) (rate(finops_http_requests_total{route="/api/trades",status=~"5.."}[1m])) / sum by(job, instance) (rate(finops_http_requests_total{route="/api/trades"}[1m])) > 0.05 and on(job, instance) sum by(job, instance) (increase(finops_http_requests_total{route="/api/trades"}[1m])) >= 20
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: 最近一分钟交易请求 5xx 超过 5%，且至少 20 个请求
+      - alert: FinopsAppDown
+        expr: up{job="finops"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: 应用指标连续 15 秒采集失败，请在独立 Prometheus 页面排查
+      - alert: FinopsOomObserved
+        expr: increase(finops_container_oom_kills_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: cgroup 观测到 OOM kill 增量，检查容器与压测子进程
